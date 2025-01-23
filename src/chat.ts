@@ -1,3 +1,4 @@
+// chat.ts
 import { getIo } from './socketManager.js';
 import { Socket } from 'socket.io'
 

@@ -1,4 +1,4 @@
-// server.ts
+// index.ts
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
@@ -26,4 +26,3 @@ setupChat();
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
-
