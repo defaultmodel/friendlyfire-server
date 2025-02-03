@@ -76,6 +76,7 @@ router.post("/upload", upload.single("image"), async (req, res) => {
 		io.emit("new image", imageUrl);
 
 		res.status(200).json({ imageUrl });
+		// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 	} catch (error: any) {
 		logger.error(`Error transcoding image: ${error.message}`);
 		res.status(500).json({ error: "Error transcoding image" });
