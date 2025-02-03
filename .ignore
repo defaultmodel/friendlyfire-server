@@ -1,0 +1,6 @@
+logs/
+eslint.config.mjs
+package.json
+pnpm-lock.yaml
+tsconfig.json
+uploads/
