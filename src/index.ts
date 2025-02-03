@@ -3,7 +3,7 @@ import http from "node:http";
 import path from "node:path";
 import cors from "cors";
 import express from "express";
-import type { Socket } from "socket.io";
+import type { Server, Socket } from "socket.io";
 import { initApiKeyManager, validateApiKey } from "./apiKeyManager.js";
 import imageRouter from "./image.js";
 import logger from "./logger.js";
@@ -17,109 +17,83 @@ import {
 import { cwd, exit } from "node:process";
 import semver from "semver";
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 const SERVER_VERSION = process.env.npm_package_version as string;
 
-if (!semver.valid(SERVER_VERSION)) {
-	logger.error(
-		`Server is trying to start with a  invalid version "${SERVER_VERSION}", expecting a valid "Semantic Versioning 2.0.0"`,
-	);
-	exit(1);
+// Validate server version
+function validateServerVersion(version: string): void {
+	if (!semver.valid(version)) {
+		logger.error(
+			`Server is trying to start with an invalid version "${version}", expecting a valid "Semantic Versioning 2.0.0"`,
+		);
+		exit(1);
+	}
 }
 
-const app = express();
-app.use(
-	cors({
-		origin: "*",
-	}),
-);
+// Initialize Express app and middleware
+function initializeApp(): express.Application {
+	const app = express();
+	app.use(cors({ origin: "*" }));
+	// app.use(express.static("public"));
+	// logger.debug("Static files served from 'public' directory");
 
-const server = http.createServer(app);
+	const uploadsDir = path.join(cwd(), "uploads", "images");
+	app.use("/uploads/images", express.static(uploadsDir));
+	logger.debug(`Serving uploaded images from ${uploadsDir}`);
 
-// Serve static files (debug)
-app.use(express.static("public"));
-logger.debug("Static files served from 'public' directory");
+	app.use("/", imageRouter);
 
-// Serve uploaded images
-const uploadsDir = path.join(cwd(), "uploads", "images");
-app.use("/uploads/images", express.static(uploadsDir));
-logger.debug(`Serving uploaded images from ${uploadsDir}`);
+	return app;
+}
 
-// Use the image router
-app.use("/", imageRouter);
+// Validate client version against server version
+function validateClientVersion(clientVersion: string): boolean {
+	if (!clientVersion || !semver.valid(clientVersion)) {
+		return false;
+	}
 
-// Initialize the Socket.IO server
-const io = init(server);
-logger.info("Socket.IO server initialized");
+	const serverMajorMinor = `${semver.major(SERVER_VERSION)}.${semver.minor(SERVER_VERSION)}`;
+	const clientMajorMinor = `${semver.major(clientVersion)}.${semver.minor(clientVersion)}`;
 
-// Initialize the API key manager
-initApiKeyManager();
+	return serverMajorMinor === clientMajorMinor;
+}
 
-// Middleware to validate API keys
-io.use((socket, next) => {
+// Socket.IO middleware for authentication and validation
+function socketMiddleware(socket: Socket, next: (err?: Error) => void): void {
 	const apiKey = socket.handshake.auth.key;
 	const username = socket.handshake.auth.username;
 	const clientVersion = socket.handshake.auth.version;
 
-	// Validate API key
-	const apiKeyRes = validateApiKey(apiKey);
-	if (!apiKeyRes) {
-		const error = new Error("Invalid API key");
-		next(error);
+	if (!validateApiKey(apiKey)) {
+		next(new Error("Invalid API key"));
 		return;
 	}
 
-	// Validate client version
-	if (!clientVersion) {
-		const error = new Error("Client version is required");
-		next(error);
-		return;
-	}
-	if (!semver.valid(clientVersion)) {
-		const error = new Error("Client version is badly ");
-		next(error);
+	if (!validateClientVersion(clientVersion)) {
+		next(new Error("Client version is invalid or mismatched"));
 		return;
 	}
 
-	// Compare MAJOR and MINOR versions
-	const serverMajorMinor = `${semver.major(SERVER_VERSION)}.${semver.minor(SERVER_VERSION)}`;
-	const clientMajorMinor = `${semver.major(clientVersion)}.${semver.minor(clientVersion)}`;
-
-	if (serverMajorMinor !== clientMajorMinor) {
-		const error = new Error(
-			`Version mismatch: Server is on ${serverMajorMinor}, and client is on ${clientMajorMinor}`,
-		);
-		next(error);
-		return;
-	}
-
-	// Validate username
-	const registeredUsername = registerUsername(socket.id, username);
-	if (!registeredUsername) {
-		const error = new Error("Username already taken");
-		next(error);
+	if (!registerUsername(socket.id, username)) {
+		next(new Error("Username already taken"));
 		return;
 	}
 
 	next();
-	return;
-});
+}
 
-// Handle Socket.IO connections
-io.on("connection", async (socket: Socket) => {
+// Handle socket connection events
+function handleSocketConnection(io: Server, socket: Socket): void {
 	const username = getUsername(socket.id);
 	logger.debug(`New client connected: ${socket.id}`);
 	logger.info(`New user connected: ${username}`);
 
-	// Listen for the "ready" event from the client
 	socket.on("ready", () => {
-		// Broadcast the updated list of connected users to all clients
 		const allUsernames = getAllUsernames();
 		io.emit("user list", allUsernames);
 		logger.debug(`Broadcasting list of all users [${allUsernames}]`);
 	});
 
-	// Handle disconnection
 	socket.on("disconnect", () => {
 		logger.info(`User disconnected: ${username}`);
 		logger.debug(`Client disconnected: ${socket.id}`);
@@ -133,8 +107,31 @@ io.on("connection", async (socket: Socket) => {
 		const allUsernames = getAllUsernames();
 		io.emit("user list", allUsernames);
 	});
-});
+}
 
-server.listen(PORT, () => {
-	logger.info(`Server is running on port ${PORT} on v${SERVER_VERSION}`);
-});
+// Start the server
+function startServer(server: http.Server, port: number): void {
+	server.listen(port, () => {
+		logger.info(`Server is running on port ${port} on v${SERVER_VERSION}`);
+	});
+}
+
+// Main function to initialize and start the server
+function main(): void {
+	validateServerVersion(SERVER_VERSION);
+
+	const app = initializeApp();
+	const server = http.createServer(app);
+
+	const io = init(server);
+	logger.info("Socket.IO server initialized");
+
+	initApiKeyManager();
+
+	io.use(socketMiddleware);
+	io.on("connection", (socket: Socket) => handleSocketConnection(io, socket));
+
+	startServer(server, PORT);
+}
+
+main();
