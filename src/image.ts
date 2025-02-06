@@ -1,3 +1,4 @@
+// image.ts
 import express from "express";
 import multer from "multer";
 import path from "node:path";
@@ -7,9 +8,12 @@ import logger from "./logger.js";
 import { cwd } from "node:process";
 import { existsSync, mkdirSync, unlinkSync } from "node:fs";
 import sharp from "sharp";
-import { Server } from "socket.io";
+import type { Server } from "socket.io";
 
 const router = express.Router();
+const mediaQueue: string[] = [];
+let queueProcessing = false;
+const DISPLAY_TIME = 5000; // TODO: should be a new-image argument later-on
 
 // Function to ensure the uploads directory exists
 function ensureUploadsDirExists(dir: string): void {
@@ -59,11 +63,27 @@ async function transcodeImage(
 		.toFile(outputFilePath);
 }
 
+async function processQueue() {
+	if (queueProcessing) return;
+	queueProcessing = true;
+
+	while (mediaQueue.length > 0) {
+		const imageUrl = mediaQueue.shift();
+		if (imageUrl) {
+			const io = getIo();
+			io.emit("new image", imageUrl);
+			logger.info(`Sending image: ${imageUrl}`);
+			await new Promise((resolve) => setTimeout(resolve, DISPLAY_TIME));
+		}
+	}
+
+	queueProcessing = false;
+}
+
 // Handle image upload
 async function handleImageUpload(
 	req: express.Request,
 	res: express.Response,
-	io: Server,
 ): Promise<void> {
 	if (!req.file) {
 		logger.warn("No file uploaded");
@@ -80,28 +100,30 @@ async function handleImageUpload(
 	try {
 		// Transcode the image to AVIF format
 		await transcodeImage(inputFilePath, outputFilePath);
+		logger.debug(`Image transcoded successfully: ${inputFilePath}`);
 
 		// Remove the original file after transcoding
 		unlinkSync(inputFilePath);
 
 		const imageUrl = `/uploads/images/${path.basename(outputFilePath)}`; // Construct the image URL
-		logger.info(`Image uploaded and transcoded successfully: ${imageUrl}`);
 
-		// Broadcast the image URL to all connected clients
-		io.emit("new image", imageUrl);
+		mediaQueue.push(imageUrl);
+		processQueue();
+		logger.debug(`Image added to queue: ${imageUrl}`);
+
+		logger.info(`Image uploaded and transcoded successfully: ${imageUrl}`);
 
 		res.status(200).json({ imageUrl });
 		// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 	} catch (error: any) {
-		logger.error(`Error transcoding image: ${error.message}`);
-		res.status(500).json({ error: "Error transcoding image" });
+		logger.error(`Error processing image: ${error.message}`);
+		res.status(500).json({ error: "Image processing failed" });
 	}
 }
 
 // POST route for image upload
 router.post("/upload", upload.single("image"), async (req, res) => {
-	const io = getIo(); // Get the Socket.IO instance
-	await handleImageUpload(req, res, io);
+	await handleImageUpload(req, res);
 });
 
 export default router;
