@@ -48,7 +48,7 @@ function initializeApp(): express.Application {
 	app.use("/uploads/images", express.static(uploadsDir));
 	logger.debug(`Serving uploaded images from ${uploadsDir}`);
 
-	app.use("/", imageRouter);
+	app.use("/", imageRouter(cliOptions.uploadDir));
 
 	return app;
 }
