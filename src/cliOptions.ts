@@ -18,6 +18,7 @@ export interface CliOptions {
   logLevel: string;
   logFormat: string;
   uploadDir: string;
+  logOutput: string;
 }
 
 export function parseCliOptions(): CliOptions {
@@ -44,6 +45,9 @@ export function parseCliOptions(): CliOptions {
       new Option('--upload-dir <directory>', 'directory to store uploaded files')
         .default(path.join(cwd(), 'uploads')) // Default upload directory
     )
+    .addOption(
+      new Option('--log-output <file>', 'file to write logs to')
+    )
     .parse(process.argv);
 
   const args = program.opts();
@@ -57,5 +61,6 @@ export function parseCliOptions(): CliOptions {
     logLevel: args.logLevel,
     logFormat: args.logFormat,
     uploadDir: args.uploadDir,
+    logOutput: args.logOutput
   };
 }

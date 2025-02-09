@@ -50,5 +50,13 @@ export const setLogFormat = (format: string) => {
 	}
 };
 
+// Function to add a file transport for logging
+export const setLogOutput = (filePath: string) => {
+    logger.add(new winston.transports.File({
+        filename: filePath, // Log file path
+        format: logger.format, // Use the current log format
+    }));
+};
+
 export default logger;
 
