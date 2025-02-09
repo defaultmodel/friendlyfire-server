@@ -16,9 +16,12 @@ import {
 } from "./userManager.js";
 import { cwd, exit } from "node:process";
 import semver from "semver";
+import { type CliOptions, parseCliOptions } from "./cliOptions.js";
 
-const PORT = Number(process.env.PORT) || 3000;
+// Initialize globals and important stuff
+const cliOptions: CliOptions = parseCliOptions();
 const SERVER_VERSION = process.env.npm_package_version as string;
+
 
 // Validate server version
 function validateServerVersion(version: string): void {
@@ -131,7 +134,7 @@ function main(): void {
 	io.use(socketMiddleware);
 	io.on("connection", (socket: Socket) => handleSocketConnection(io, socket));
 
-	startServer(server, PORT);
+	startServer(server, cliOptions.port);
 }
 
 main();
