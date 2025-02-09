@@ -1,5 +1,5 @@
 // index.ts
-import logger, { setLogLevel } from "./logger.js";
+import logger, { setLogFormat, setLogLevel } from "./logger.js";
 import { type CliOptions, parseCliOptions } from "./cliOptions.js";
 
 // Initialize globals and important stuff
@@ -7,6 +7,7 @@ const cliOptions: CliOptions = parseCliOptions();
 // Initialize logger early, because of order of initialization
 // If ran later the logger is not initialized when other files are imported
 setLogLevel(cliOptions.logLevel);
+setLogFormat(cliOptions.logFormat);
 const SERVER_VERSION = process.env.npm_package_version as string;
 
 import http from "node:http";
