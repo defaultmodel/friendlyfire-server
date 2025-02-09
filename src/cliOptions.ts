@@ -14,20 +14,27 @@ function portParser(value: string): number {
 export interface CliOptions {
   port: number;
   logLevel: string;
+  logFormat: string;
 }
 
 export function parseCliOptions(): CliOptions {
   const program = new Command();
 
   program
-    .addOption(new Option('-p, --port <number>', 'port number')
-      .argParser(portParser) // Use the custom port parser
-      .env('PORT') // Allow the port to be set via the PORT environment variable
-      .default(3000)) // Default port is 3000
+    .addOption(
+      new Option('-p, --port <number>', 'port number')
+        .argParser(portParser) // Use the custom port parser
+        .env('PORT') // Allow the port to be set via the PORT environment variable
+        .default(3000)) // Default port is 3000
     .addOption(
       new Option('-l, --log-level <level>', 'set the minimum log level')
         .choices(['error', 'warn', 'info', 'debug']) // Only allow these values
         .default('info') // Default log level is 'info'
+    )
+    .addOption(
+      new Option('--log-format <format>', 'set the log format')
+        .choices(['json', 'plain', 'pretty']) // Only allow these values
+        .default('plain') // Default log format is 'plain'
     )
     .parse(process.argv);
 
@@ -40,5 +47,6 @@ export function parseCliOptions(): CliOptions {
   return {
     port: args.port,
     logLevel: args.logLevel,
+    logFormat: args.logFormat
   };
 }
