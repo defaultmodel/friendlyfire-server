@@ -24,7 +24,7 @@ import {
 	registerUsername,
 	removeUsername,
 } from "./userManager.js";
-import { cwd, exit } from "node:process";
+import { exit } from "node:process";
 import semver from "semver";
 
 // Validate server version
@@ -44,7 +44,7 @@ function initializeApp(): express.Application {
 	// app.use(express.static("public"));
 	// logger.debug("Static files served from 'public' directory");
 
-	const uploadsDir = path.join(cwd(), "uploads", "images");
+	const uploadsDir = path.join(cliOptions.uploadDir, "images");
 	app.use("/uploads/images", express.static(uploadsDir));
 	logger.debug(`Serving uploaded images from ${uploadsDir}`);
 
