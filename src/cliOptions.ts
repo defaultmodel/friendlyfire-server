@@ -1,4 +1,6 @@
 import { Command, Option } from 'commander';
+import path from 'node:path';
+import { cwd } from 'node:process';
 
 function portParser(value: string): number {
   const port = parseInt(value, 10);
@@ -15,6 +17,7 @@ export interface CliOptions {
   port: number;
   logLevel: string;
   logFormat: string;
+  uploadDir: string;
 }
 
 export function parseCliOptions(): CliOptions {
@@ -25,7 +28,8 @@ export function parseCliOptions(): CliOptions {
       new Option('-p, --port <number>', 'port number')
         .argParser(portParser) // Use the custom port parser
         .env('PORT') // Allow the port to be set via the PORT environment variable
-        .default(3000)) // Default port is 3000
+        .default(3000) // Default port is 3000
+    )
     .addOption(
       new Option('-l, --log-level <level>', 'set the minimum log level')
         .choices(['error', 'warn', 'info', 'debug']) // Only allow these values
@@ -35,6 +39,10 @@ export function parseCliOptions(): CliOptions {
       new Option('--log-format <format>', 'set the log format')
         .choices(['json', 'plain', 'pretty']) // Only allow these values
         .default('plain') // Default log format is 'plain'
+    )
+    .addOption(
+      new Option('--upload-dir <directory>', 'directory to store uploaded files')
+        .default(path.join(cwd(), 'uploads')) // Default upload directory
     )
     .parse(process.argv);
 
@@ -47,6 +55,7 @@ export function parseCliOptions(): CliOptions {
   return {
     port: args.port,
     logLevel: args.logLevel,
-    logFormat: args.logFormat
+    logFormat: args.logFormat,
+    uploadDir: args.uploadDir,
   };
 }
