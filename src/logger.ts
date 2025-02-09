@@ -1,11 +1,6 @@
 // logger.ts
 import winston from 'winston';
 
-// Create a logger instance
-const myFormat = winston.format.printf(({ level, message, timestamp }) => {
-	return `${timestamp} ${level}: ${message}`;
-});
-
 const jsonFormat = winston.format.combine(
 	winston.format.timestamp(),
 	winston.format.json() // Log in JSON format
