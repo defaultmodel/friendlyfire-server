@@ -1,14 +1,17 @@
 // logger.ts
-import winston from "winston";
+import winston from 'winston';
 
+// Create a logger instance
 const myFormat = winston.format.printf(({ level, message, timestamp }) => {
 	return `${timestamp} ${level}: ${message}`;
 });
 
-// Create a logger instance
 const logger = winston.createLogger({
-	level: "debug", // Set the minimum log level (e.g., 'info', 'warn', 'error', 'debug')
-	format: winston.format.combine(winston.format.timestamp(), myFormat),
+	level: "info", // modified by `setLogLevel`
+	format: winston.format.combine(
+		winston.format.timestamp(),
+		myFormat
+	),
 	transports: [
 		// Log to the console
 		new winston.transports.Console({
@@ -17,10 +20,14 @@ const logger = winston.createLogger({
 				winston.format.simple(), // Simple readable format for console
 			),
 		}),
-		// Log to a file
-		// new winston.transports.File({ filename: "logs/error.log", level: "error" }), // Log only errors to a file
-		// new winston.transports.File({ filename: "logs/combined.log" }), // Log all levels to another file
 	],
 });
 
+
+// Function to update the logging level
+export const setLogLevel = (level: string) => {
+	logger.level = level;
+};
+
 export default logger;
+

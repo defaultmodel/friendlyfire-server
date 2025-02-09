@@ -13,6 +13,7 @@ function portParser(value: string): number {
 
 export interface CliOptions {
   port: number;
+  logLevel: string;
 }
 
 export function parseCliOptions(): CliOptions {
@@ -23,6 +24,11 @@ export function parseCliOptions(): CliOptions {
       .argParser(portParser) // Use the custom port parser
       .env('PORT') // Allow the port to be set via the PORT environment variable
       .default(3000)) // Default port is 3000
+    .addOption(
+      new Option('-l, --log-level <level>', 'set the minimum log level')
+        .choices(['error', 'warn', 'info', 'debug']) // Only allow these values
+        .default('info') // Default log level is 'info'
+    )
     .parse(process.argv);
 
   const args = program.opts();
@@ -33,5 +39,6 @@ export function parseCliOptions(): CliOptions {
 
   return {
     port: args.port,
+    logLevel: args.logLevel,
   };
 }
