@@ -1,4 +1,14 @@
 // index.ts
+import logger, { setLogLevel } from "./logger.js";
+import { type CliOptions, parseCliOptions } from "./cliOptions.js";
+
+// Initialize globals and important stuff
+const cliOptions: CliOptions = parseCliOptions();
+// Initialize logger early, because of order of initialization
+// If ran later the logger is not initialized when other files are imported
+setLogLevel(cliOptions.logLevel);
+const SERVER_VERSION = process.env.npm_package_version as string;
+
 import http from "node:http";
 import path from "node:path";
 import cors from "cors";
@@ -6,7 +16,6 @@ import express from "express";
 import type { Server, Socket } from "socket.io";
 import { initApiKeyManager, validateApiKey } from "./apiKeyManager.js";
 import imageRouter from "./image.js";
-import logger from "./logger.js";
 import { init } from "./socketManager.js";
 import {
 	getAllUsernames,
@@ -16,12 +25,6 @@ import {
 } from "./userManager.js";
 import { cwd, exit } from "node:process";
 import semver from "semver";
-import { type CliOptions, parseCliOptions } from "./cliOptions.js";
-
-// Initialize globals and important stuff
-const cliOptions: CliOptions = parseCliOptions();
-const SERVER_VERSION = process.env.npm_package_version as string;
-
 
 // Validate server version
 function validateServerVersion(version: string): void {
