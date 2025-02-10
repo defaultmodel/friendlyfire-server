@@ -1,4 +1,19 @@
 // index.ts
+import logger, { setLogFormat, setLogLevel, setLogOutput } from "./logger.js";
+import { type CliOptions, parseCliOptions } from "./cliOptions.js";
+
+// Initialize globals and important stuff
+const cliOptions: CliOptions = parseCliOptions();
+// Initialize logger early, because of order of initialization
+// If ran later the logger is not initialized when other files are imported
+setLogLevel(cliOptions.logLevel);
+setLogFormat(cliOptions.logFormat);
+// Set the log output file if provided
+if (cliOptions.logOutput) {
+	setLogOutput(cliOptions.logOutput);
+}
+const SERVER_VERSION = process.env.npm_package_version as string;
+
 import http from "node:http";
 import path from "node:path";
 import cors from "cors";
@@ -6,7 +21,6 @@ import express from "express";
 import type { Server, Socket } from "socket.io";
 import { initApiKeyManager, validateApiKey } from "./apiKeyManager.js";
 import imageRouter from "./image.js";
-import logger from "./logger.js";
 import { init } from "./socketManager.js";
 import {
 	getAllUsernames,
@@ -14,11 +28,8 @@ import {
 	registerUsername,
 	removeUsername,
 } from "./userManager.js";
-import { cwd, exit } from "node:process";
+import { exit } from "node:process";
 import semver from "semver";
-
-const PORT = Number(process.env.PORT) || 3000;
-const SERVER_VERSION = process.env.npm_package_version as string;
 
 // Validate server version
 function validateServerVersion(version: string): void {
@@ -37,11 +48,11 @@ function initializeApp(): express.Application {
 	// app.use(express.static("public"));
 	// logger.debug("Static files served from 'public' directory");
 
-	const uploadsDir = path.join(cwd(), "uploads", "images");
+	const uploadsDir = path.join(cliOptions.uploadDir, "images");
 	app.use("/uploads/images", express.static(uploadsDir));
 	logger.debug(`Serving uploaded images from ${uploadsDir}`);
 
-	app.use("/", imageRouter);
+	app.use("/", imageRouter(cliOptions.uploadDir));
 
 	return app;
 }
@@ -131,7 +142,7 @@ function main(): void {
 	io.use(socketMiddleware);
 	io.on("connection", (socket: Socket) => handleSocketConnection(io, socket));
 
-	startServer(server, PORT);
+	startServer(server, cliOptions.port);
 }
 
 main();

@@ -1,26 +1,65 @@
 // logger.ts
 import winston from "winston";
 
-const myFormat = winston.format.printf(({ level, message, timestamp }) => {
-	return `${timestamp} ${level}: ${message}`;
-});
+const jsonFormat = winston.format.combine(
+	winston.format.timestamp(),
+	winston.format.json(), // Log in JSON format
+);
 
-// Create a logger instance
+const prettyFormat = winston.format.combine(
+	winston.format.timestamp(),
+	winston.format.prettyPrint(), // JSON pretty-print the logs
+);
+
+const plainFormat = winston.format.combine(
+	winston.format.timestamp(),
+	winston.format.colorize(), // Add colors to console output
+	winston.format.printf(({ level, message, timestamp }) => {
+		return `${timestamp} ${level}: ${message}`; // Plain text format
+	}),
+);
+
+// Create a default logger tthat will be modified via the function below in index.ts
 const logger = winston.createLogger({
-	level: "debug", // Set the minimum log level (e.g., 'info', 'warn', 'error', 'debug')
-	format: winston.format.combine(winston.format.timestamp(), myFormat),
+	level: "info", // Default log level, modified by `setLogLevel`
+	format: prettyFormat, // Default format, modified by `setLogFormat`
 	transports: [
 		// Log to the console
-		new winston.transports.Console({
-			format: winston.format.combine(
-				winston.format.colorize(), // Add colors to console output
-				winston.format.simple(), // Simple readable format for console
-			),
-		}),
-		// Log to a file
-		// new winston.transports.File({ filename: "logs/error.log", level: "error" }), // Log only errors to a file
-		// new winston.transports.File({ filename: "logs/combined.log" }), // Log all levels to another file
+		new winston.transports.Console(),
 	],
 });
+
+// Function to update the logging level
+export const setLogLevel = (level: string) => {
+	logger.level = level;
+};
+
+// Function to update the log format
+export const setLogFormat = (format: string) => {
+	switch (format) {
+		case "json":
+			logger.format = jsonFormat;
+			break;
+		case "pretty":
+			logger.format = prettyFormat;
+			break;
+		case "plain":
+			logger.format = plainFormat;
+			break;
+		default:
+			logger.format = plainFormat;
+			break;
+	}
+};
+
+// Function to add a file transport for logging
+export const setLogOutput = (filePath: string) => {
+	logger.add(
+		new winston.transports.File({
+			filename: filePath, // Log file path
+			format: logger.format, // Use the current log format
+		}),
+	);
+};
 
 export default logger;
