@@ -4,12 +4,9 @@ import path from "node:path";
 import { v4 as uuidv4 } from "uuid";
 import { getIo } from "./socketManager.js";
 import logger from "./logger.js";
-import { cwd } from "node:process";
 import { existsSync, mkdirSync, unlinkSync } from "node:fs";
 import sharp from "sharp";
-import { Server } from "socket.io";
-
-const router = express.Router();
+import type { Server } from "socket.io";
 
 // Function to ensure the uploads directory exists
 function ensureUploadsDirExists(dir: string): void {
@@ -20,10 +17,10 @@ function ensureUploadsDirExists(dir: string): void {
 }
 
 // Configure multer for file uploads
-function configureMulter() {
+function configureMulter(uploadsDir: string) {
 	const storage = multer.diskStorage({
 		destination: (_req, _file, cb) => {
-			const uploadDir = path.join(cwd(), "uploads", "images");
+			const uploadDir = path.join(uploadsDir, "images");
 			ensureUploadsDirExists(uploadDir); // Ensure the directory exists
 			cb(null, uploadDir);
 		},
@@ -46,8 +43,6 @@ function configureMulter() {
 		},
 	});
 }
-
-const upload = configureMulter();
 
 // Transcode image to AVIF format
 async function transcodeImage(
@@ -98,10 +93,16 @@ async function handleImageUpload(
 	}
 }
 
-// POST route for image upload
-router.post("/upload", upload.single("image"), async (req, res) => {
-	const io = getIo(); // Get the Socket.IO instance
-	await handleImageUpload(req, res, io);
-});
+// Create and configure the image router
+export default function createImageRouter(uploadDir: string) {
+	const router = express.Router();
+	const upload = configureMulter(uploadDir);
 
-export default router;
+	// POST route for image upload
+	router.post("/upload", upload.single("image"), async (req, res) => {
+		const io = getIo(); // Get the Socket.IO instance
+		await handleImageUpload(req, res, io);
+	});
+
+	return router;
+}
