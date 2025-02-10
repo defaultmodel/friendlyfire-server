@@ -4,10 +4,9 @@ import path from "node:path";
 import { v4 as uuidv4 } from "uuid";
 import { getIo } from "./socketManager.js";
 import logger from "./logger.js";
-import { cwd } from "node:process";
 import { existsSync, mkdirSync, unlinkSync } from "node:fs";
 import sharp from "sharp";
-import { Server } from "socket.io";
+import type { Server } from "socket.io";
 
 // Function to ensure the uploads directory exists
 function ensureUploadsDirExists(dir: string): void {
@@ -44,7 +43,6 @@ function configureMulter(uploadsDir: string) {
 		},
 	});
 }
-
 
 // Transcode image to AVIF format
 async function transcodeImage(
@@ -97,14 +95,14 @@ async function handleImageUpload(
 
 // Create and configure the image router
 export default function createImageRouter(uploadDir: string) {
-    const router = express.Router();
-    const upload = configureMulter(uploadDir);
+	const router = express.Router();
+	const upload = configureMulter(uploadDir);
 
-    // POST route for image upload
-    router.post("/upload", upload.single("image"), async (req, res) => {
-        const io = getIo(); // Get the Socket.IO instance
-        await handleImageUpload(req, res, io);
-    });
+	// POST route for image upload
+	router.post("/upload", upload.single("image"), async (req, res) => {
+		const io = getIo(); // Get the Socket.IO instance
+		await handleImageUpload(req, res, io);
+	});
 
-    return router;
+	return router;
 }

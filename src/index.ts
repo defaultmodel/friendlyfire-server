@@ -10,7 +10,7 @@ setLogLevel(cliOptions.logLevel);
 setLogFormat(cliOptions.logFormat);
 // Set the log output file if provided
 if (cliOptions.logOutput) {
-    setLogOutput(cliOptions.logOutput);
+	setLogOutput(cliOptions.logOutput);
 }
 const SERVER_VERSION = process.env.npm_package_version as string;
 
