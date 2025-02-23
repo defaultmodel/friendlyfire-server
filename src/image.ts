@@ -111,8 +111,12 @@ async function handleImageUpload(
 
 	const displayTime = Number.parseInt(req.body.displayTime, 10);
 	if (Number.isNaN(displayTime)) {
-		logger.warn("Invalid displayTime value");
-		res.status(400).json({ error: "Invalid displayTime value" });
+		logger.warn(
+			`display time sent by ${req.ip} is not a number: ${displayTime}`,
+		);
+		res.status(400).json({
+			error: `the display time you sent was not a number ${displayTime}`,
+		});
 		return;
 	}
 
@@ -134,21 +138,21 @@ async function handleImageUpload(
 			`Image added to queue: ${`/uploads/images/${path.basename(outputFilePath)}`}`,
 		);
 
-		logger.info(
-			`Image uploaded and transcoded successfully: ${`/uploads/images/${path.basename(outputFilePath)}`}`,
-		);
-
 		res
 			.status(200)
 			.json({ imageUrl: `/uploads/images/${path.basename(outputFilePath)}` });
+		logger.info(
+			`Image uploaded and transcoded successfully: ${`/uploads/images/${path.basename(outputFilePath)}`}`,
+		);
 	} catch (error) {
+		unlinkSync(inputFilePath); // Attempt to delete the original file
 		if (typeof error === "string") {
 			logger.error(`Error handling upload: ${error}`);
+			res.status(500).json({ error: `Error handling upload: ${error}` });
 		} else if (error instanceof Error) {
 			logger.error(`Error handling upload: ${error.message}`);
+			res.status(500).json({ error: `Error handling upload: ${error}` });
 		}
-		unlinkSync(inputFilePath); // Attempt to delete the original file in case of error
-		res.status(500).json({ error: "Image processing failed" });
 		return;
 	}
 }
