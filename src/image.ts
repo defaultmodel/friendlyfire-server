@@ -74,11 +74,11 @@ async function processQueue() {
 		while (mediaQueue.length > 0) {
 			const media = mediaQueue.shift();
 			if (media) {
-				const { url, displayTime: timeout } = media;
+				const { url, displayTime } = media;
 				const io = getIo();
-				io.emit("new image", url);
+				io.emit("new image", url, displayTime);
 				logger.info(`Sending image: ${url}`);
-				await new Promise((resolve) => setTimeout(resolve, timeout));
+				await new Promise((resolve) => setTimeout(resolve, displayTime));
 			}
 		}
 	} catch (error) {
