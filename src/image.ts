@@ -83,9 +83,9 @@ async function processQueue() {
 		}
 	} catch (error) {
 		if (typeof error === "string") {
-			error.toUpperCase(); // works, `e` narrowed to string
+			logger.error(`Error processing image in queue: ${error}`);
 		} else if (error instanceof Error) {
-			error.message; // works, `e` narrowed to Error
+			logger.error(`Error processing image in queue: ${error.message}`);
 		}
 	} finally {
 		queueProcessing = false;
@@ -141,9 +141,12 @@ async function handleImageUpload(
 		res
 			.status(200)
 			.json({ imageUrl: `/uploads/images/${path.basename(outputFilePath)}` });
-		// biome-ignore lint/suspicious/noExplicitAny: <explanation>
-	} catch (error: any) {
-		logger.error(`Error processing image: ${error.message}`);
+	} catch (error) {
+		if (typeof error === "string") {
+			logger.error(`Error handling upload: ${error}`);
+		} else if (error instanceof Error) {
+			logger.error(`Error handling upload: ${error.message}`);
+		}
 		unlinkSync(inputFilePath); // Attempt to delete the original file in case of error
 		res.status(500).json({ error: "Image processing failed" });
 		return;
