@@ -8,12 +8,15 @@ import logger from "./logger.js";
 import { cwd } from "node:process";
 import { existsSync, mkdirSync, unlinkSync } from "node:fs";
 import sharp from "sharp";
-import type { Server } from "socket.io";
+
+type Media = {
+	url: string;
+	displayTime: number;
+};
 
 const router = express.Router();
-const mediaQueue: string[] = [];
+const mediaQueue: Media[] = [];
 let queueProcessing = false;
-const DISPLAY_TIME = 5000; // TODO: should be a new-image argument later-on
 
 // Function to ensure the uploads directory exists
 function ensureUploadsDirExists(dir: string): void {
@@ -67,17 +70,26 @@ async function processQueue() {
 	if (queueProcessing) return;
 	queueProcessing = true;
 
-	while (mediaQueue.length > 0) {
-		const imageUrl = mediaQueue.shift();
-		if (imageUrl) {
-			const io = getIo();
-			io.emit("new image", imageUrl);
-			logger.info(`Sending image: ${imageUrl}`);
-			await new Promise((resolve) => setTimeout(resolve, DISPLAY_TIME));
+	try {
+		while (mediaQueue.length > 0) {
+			const media = mediaQueue.shift();
+			if (media) {
+				const { url, displayTime: timeout } = media;
+				const io = getIo();
+				io.emit("new image", url);
+				logger.info(`Sending image: ${url}`);
+				await new Promise((resolve) => setTimeout(resolve, timeout));
+			}
 		}
+	} catch (error) {
+		if (typeof error === "string") {
+			error.toUpperCase(); // works, `e` narrowed to string
+		} else if (error instanceof Error) {
+			error.message; // works, `e` narrowed to Error
+		}
+	} finally {
+		queueProcessing = false;
 	}
-
-	queueProcessing = false;
 }
 
 // Handle image upload
@@ -97,6 +109,13 @@ async function handleImageUpload(
 		`${path.basename(inputFilePath, path.extname(inputFilePath))}.avif`,
 	);
 
+	const displayTime = Number.parseInt(req.body.displayTime, 10);
+	if (Number.isNaN(displayTime)) {
+		logger.warn("Invalid displayTime value");
+		res.status(400).json({ error: "Invalid displayTime value" });
+		return;
+	}
+
 	try {
 		// Transcode the image to AVIF format
 		await transcodeImage(inputFilePath, outputFilePath);
@@ -105,19 +124,29 @@ async function handleImageUpload(
 		// Remove the original file after transcoding
 		unlinkSync(inputFilePath);
 
-		const imageUrl = `/uploads/images/${path.basename(outputFilePath)}`; // Construct the image URL
-
-		mediaQueue.push(imageUrl);
+		const media: Media = {
+			url: `/uploads/images/${path.basename(outputFilePath)}`,
+			displayTime: displayTime,
+		};
+		mediaQueue.push(media);
 		processQueue();
-		logger.debug(`Image added to queue: ${imageUrl}`);
+		logger.debug(
+			`Image added to queue: ${`/uploads/images/${path.basename(outputFilePath)}`}`,
+		);
 
-		logger.info(`Image uploaded and transcoded successfully: ${imageUrl}`);
+		logger.info(
+			`Image uploaded and transcoded successfully: ${`/uploads/images/${path.basename(outputFilePath)}`}`,
+		);
 
-		res.status(200).json({ imageUrl });
+		res
+			.status(200)
+			.json({ imageUrl: `/uploads/images/${path.basename(outputFilePath)}` });
 		// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 	} catch (error: any) {
 		logger.error(`Error processing image: ${error.message}`);
+		unlinkSync(inputFilePath); // Attempt to delete the original file in case of error
 		res.status(500).json({ error: "Image processing failed" });
+		return;
 	}
 }
 
