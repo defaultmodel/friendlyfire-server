@@ -100,10 +100,7 @@ async function handleImageUpload(
 	}
 
 	const inputFilePath = req.file.path;
-	const outputFilePath = path.join(
-		path.dirname(inputFilePath),
-		`${path.basename(inputFilePath, path.extname(inputFilePath))}.avif`,
-	);
+	let outputFilePath = inputFilePath; // default, changed later if transcoded
 
 	const displayTime = Number.parseInt(req.body.displayTime, 10);
 	if (Number.isNaN(displayTime)) {
@@ -118,11 +115,19 @@ async function handleImageUpload(
 
 	try {
 		// Transcode the image to AVIF format
-		await transcodeImage(inputFilePath, outputFilePath);
-		logger.debug(`Image transcoded successfully: ${inputFilePath}`);
+		// don't transcode GIF because it won't be animated anymore
+		// Transcode the image to AVIF format only if it's not a GIF
+		if (req.file.mimetype !== "image/gif") {
+			outputFilePath = path.join(
+				path.dirname(inputFilePath),
+				`${path.basename(inputFilePath, path.extname(inputFilePath))}.avif`,
+			);
+			await transcodeImage(inputFilePath, outputFilePath);
+			logger.debug(`Image transcoded successfully: ${inputFilePath}`);
 
-		// Remove the original file after transcoding
-		unlinkSync(inputFilePath);
+			// Remove the original file after transcoding
+			unlinkSync(inputFilePath);
+		}
 
 		const media: Media = {
 			url: `/uploads/images/${path.basename(outputFilePath)}`,
