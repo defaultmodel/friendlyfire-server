@@ -1,3 +1,4 @@
+// image.ts
 import express from "express";
 import multer from "multer";
 import path from "node:path";
@@ -6,7 +7,14 @@ import { getIo } from "./socketManager.js";
 import logger from "./logger.js";
 import { existsSync, mkdirSync, unlinkSync } from "node:fs";
 import sharp from "sharp";
-import type { Server } from "socket.io";
+
+type Media = {
+	url: string;
+	displayTime: number;
+};
+
+const mediaQueue: Media[] = [];
+let queueProcessing = false;
 
 // Function to ensure the uploads directory exists
 function ensureUploadsDirExists(dir: string): void {
@@ -54,11 +62,36 @@ async function transcodeImage(
 		.toFile(outputFilePath);
 }
 
+async function processQueue() {
+	if (queueProcessing) return;
+	queueProcessing = true;
+
+	try {
+		while (mediaQueue.length > 0) {
+			const media = mediaQueue.shift();
+			if (media) {
+				const { url, displayTime } = media;
+				const io = getIo();
+				io.emit("new image", url, displayTime);
+				logger.info(`Sending image: ${url}`);
+				await new Promise((resolve) => setTimeout(resolve, displayTime));
+			}
+		}
+	} catch (error) {
+		if (typeof error === "string") {
+			logger.error(`Error processing image in queue: ${error}`);
+		} else if (error instanceof Error) {
+			logger.error(`Error processing image in queue: ${error.message}`);
+		}
+	} finally {
+		queueProcessing = false;
+	}
+}
+
 // Handle image upload
 async function handleImageUpload(
 	req: express.Request,
 	res: express.Response,
-	io: Server,
 ): Promise<void> {
 	if (!req.file) {
 		logger.warn("No file uploaded");
@@ -72,24 +105,51 @@ async function handleImageUpload(
 		`${path.basename(inputFilePath, path.extname(inputFilePath))}.avif`,
 	);
 
+	const displayTime = Number.parseInt(req.body.displayTime, 10);
+	if (Number.isNaN(displayTime)) {
+		logger.warn(
+			`display time sent by ${req.ip} is not a number: ${displayTime}`,
+		);
+		res.status(400).json({
+			error: `the display time you sent was not a number ${displayTime}`,
+		});
+		return;
+	}
+
 	try {
 		// Transcode the image to AVIF format
 		await transcodeImage(inputFilePath, outputFilePath);
+		logger.debug(`Image transcoded successfully: ${inputFilePath}`);
 
 		// Remove the original file after transcoding
 		unlinkSync(inputFilePath);
 
-		const imageUrl = `/uploads/images/${path.basename(outputFilePath)}`; // Construct the image URL
-		logger.info(`Image uploaded and transcoded successfully: ${imageUrl}`);
+		const media: Media = {
+			url: `/uploads/images/${path.basename(outputFilePath)}`,
+			displayTime: displayTime,
+		};
+		mediaQueue.push(media);
+		processQueue();
+		logger.debug(
+			`Image added to queue: ${`/uploads/images/${path.basename(outputFilePath)}`}`,
+		);
 
-		// Broadcast the image URL to all connected clients
-		io.emit("new image", imageUrl);
-
-		res.status(200).json({ imageUrl });
-		// biome-ignore lint/suspicious/noExplicitAny: <explanation>
-	} catch (error: any) {
-		logger.error(`Error transcoding image: ${error.message}`);
-		res.status(500).json({ error: "Error transcoding image" });
+		res
+			.status(200)
+			.json({ imageUrl: `/uploads/images/${path.basename(outputFilePath)}` });
+		logger.info(
+			`Image uploaded and transcoded successfully: ${`/uploads/images/${path.basename(outputFilePath)}`}`,
+		);
+	} catch (error) {
+		unlinkSync(inputFilePath); // Attempt to delete the original file
+		if (typeof error === "string") {
+			logger.error(`Error handling upload: ${error}`);
+			res.status(500).json({ error: `Error handling upload: ${error}` });
+		} else if (error instanceof Error) {
+			logger.error(`Error handling upload: ${error.message}`);
+			res.status(500).json({ error: `Error handling upload: ${error}` });
+		}
+		return;
 	}
 }
 
@@ -97,11 +157,9 @@ async function handleImageUpload(
 export default function createImageRouter(uploadDir: string) {
 	const router = express.Router();
 	const upload = configureMulter(uploadDir);
-
 	// POST route for image upload
 	router.post("/upload", upload.single("image"), async (req, res) => {
-		const io = getIo(); // Get the Socket.IO instance
-		await handleImageUpload(req, res, io);
+		await handleImageUpload(req, res);
 	});
 
 	return router;
