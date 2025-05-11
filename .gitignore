@@ -3,3 +3,4 @@ node_modules/
 uploads/
 api_keys.json
 .ignore
+logs/
