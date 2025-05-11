@@ -1,4 +1,3 @@
-// image.ts
 import express from "express";
 import multer from "multer";
 import path from "node:path";
@@ -57,9 +56,17 @@ async function transcodeImage(
 	inputFilePath: string,
 	outputFilePath: string,
 ): Promise<void> {
-	await sharp(inputFilePath)
-		.avif({ quality: 50, effort: 2 }) // Adjust quality as needed
-		.toFile(outputFilePath);
+	try {
+		await sharp(inputFilePath)
+			.avif({ quality: 50, effort: 2 }) // Adjust quality as needed
+			.toFile(outputFilePath);
+		logger.debug(`Image transcoded successfully: ${inputFilePath}`);
+	} catch (error) {
+		logger.error(
+			`Error transcoding image: ${error instanceof Error ? error.message : error}`,
+		);
+		throw error;
+	}
 }
 
 async function processQueue() {
@@ -78,11 +85,9 @@ async function processQueue() {
 			}
 		}
 	} catch (error) {
-		if (typeof error === "string") {
-			logger.error(`Error processing image in queue: ${error}`);
-		} else if (error instanceof Error) {
-			logger.error(`Error processing image in queue: ${error.message}`);
-		}
+		logger.error(
+			`Error processing image in queue: ${error instanceof Error ? error.message : error}`,
+		);
 	} finally {
 		queueProcessing = false;
 	}
@@ -147,14 +152,14 @@ async function handleImageUpload(
 		);
 	} catch (error) {
 		unlinkSync(inputFilePath); // Attempt to delete the original file
-		if (typeof error === "string") {
-			logger.error(`Error handling upload: ${error}`);
-			res.status(500).json({ error: `Error handling upload: ${error}` });
-		} else if (error instanceof Error) {
-			logger.error(`Error handling upload: ${error.message}`);
-			res.status(500).json({ error: `Error handling upload: ${error}` });
-		}
-		return;
+		logger.error(
+			`Error handling upload: ${error instanceof Error ? error.message : error}`,
+		);
+		res
+			.status(500)
+			.json({
+				error: `Error handling upload: ${error instanceof Error ? error.message : error}`,
+			});
 	}
 }
 

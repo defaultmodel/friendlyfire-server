@@ -1,6 +1,7 @@
 import { Command, Option } from "commander";
 import path from "node:path";
 import { cwd } from "node:process";
+import logger from "./logger.js";
 
 function portParser(value: string): number {
 	const port = Number.parseInt(value, 10);
@@ -57,6 +58,14 @@ export function parseCliOptions(): CliOptions {
 	if (args.help !== undefined) {
 		program.help();
 	}
+
+	logger.debug("Parsed CLI options:", {
+		port: args.port,
+		logLevel: args.logLevel,
+		logFormat: args.logFormat,
+		uploadDir: args.uploadDir,
+		logOutput: args.logOutput,
+	});
 
 	return {
 		port: args.port,

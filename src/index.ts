@@ -1,4 +1,3 @@
-// index.ts
 import logger, { setLogFormat, setLogLevel, setLogOutput } from "./logger.js";
 import { type CliOptions, parseCliOptions } from "./cliOptions.js";
 
@@ -129,20 +128,27 @@ function startServer(server: http.Server, port: number): void {
 
 // Main function to initialize and start the server
 function main(): void {
-	validateServerVersion(SERVER_VERSION);
+	try {
+		validateServerVersion(SERVER_VERSION);
 
-	const app = initializeApp();
-	const server = http.createServer(app);
+		const app = initializeApp();
+		const server = http.createServer(app);
 
-	const io = init(server);
-	logger.info("Socket.IO server initialized");
+		const io = init(server);
+		logger.info("Socket.IO server initialized");
 
-	initApiKeyManager();
+		initApiKeyManager();
 
-	io.use(socketMiddleware);
-	io.on("connection", (socket: Socket) => handleSocketConnection(io, socket));
+		io.use(socketMiddleware);
+		io.on("connection", (socket: Socket) => handleSocketConnection(io, socket));
 
-	startServer(server, cliOptions.port);
+		startServer(server, cliOptions.port);
+	} catch (error) {
+		logger.error(
+			`Error starting server: ${error instanceof Error ? error.message : error}`,
+		);
+		exit(1);
+	}
 }
 
 main();
